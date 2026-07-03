@@ -1,0 +1,28 @@
+name: remote_data_kit_example
+description: "Ejemplo de uso del paquete remote_data_kit."
+publish_to: 'none'
+
+environment:
+  sdk: ^3.6.0
+  flutter: ">=3.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  remote_data_kit:
+    path: ../
+  dio: ^5.8.2
+  retrofit: ^4.9.2
+  retrofit_generator: ^10.2.7
+  json_annotation: ^4.9.0
+
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+  build_runner: ^2.4.15
+  json_serializable: ^6.9.3
+
+flutter:
+  uses-material-design: true
