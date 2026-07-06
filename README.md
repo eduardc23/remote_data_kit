@@ -367,5 +367,5 @@ Consulta el archivo `CHANGELOG.md`.
 
 ## Licencia y Autor
 
-- **Autor**: Eduard Casas
-- **Licencia**: MIT
+- **Autor**: [Eduard](https://github.com/eduardc23)
+- **Licencia**: Este proyecto está bajo la Licencia MIT.

@@ -3,10 +3,10 @@ description: Un paquete reutilizable para el consumo de APIs usando Dio con mane
 version: 1.0.0
 
 environment:
-  sdk: ^3.12.2
+  sdk: ">=3.0.0 <4.0.0"
 
 dependencies:
-  dio: ^5.9.2
+  dio: ^5.10.0
 
 dev_dependencies:
   lints: ^6.0.0
