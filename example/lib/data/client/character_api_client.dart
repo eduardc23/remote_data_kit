@@ -1,4 +1,4 @@
-import 'package:dio/dio.dart';
+import 'package:remote_data_kit/remote_data_kit.dart';
 import 'package:retrofit/retrofit.dart';
 import '../models/character_response_model.dart';
 

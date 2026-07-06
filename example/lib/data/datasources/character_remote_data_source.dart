@@ -1,4 +1,3 @@
-import 'package:dio/dio.dart';
 import 'package:remote_data_kit/remote_data_kit.dart';
 import '../client/character_api_client.dart';
 import '../models/character_response_model.dart';
