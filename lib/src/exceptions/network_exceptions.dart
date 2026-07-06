@@ -14,5 +14,5 @@ class NotFoundException extends RemoteException {}
 
 class RateLimitException extends RemoteException {
   final Duration retryAfter;
-  RateLimitException({required this.retryAfter, super.message});
+  RateLimitException({required this.retryAfter});
 }

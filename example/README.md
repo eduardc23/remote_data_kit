@@ -42,6 +42,85 @@ lib/
 
 ---
 
+## Integración completa: ejemplo con Rick & Morty API
+
+Este es el flujo completo de cómo un proyecto consume el paquete. Todo el código de abajo vive **en tu app**, no en el paquete.
+
+**1. Crea el cliente Retrofit con el `Dio` del paquete:**
+
+```dart
+// character_api_client.dart
+@RestApi()
+abstract class CharacterApiClient {
+  factory CharacterApiClient(Dio dio, {String baseUrl}) = _CharacterApiClient;
+
+  @GET('/character')
+  Future<CharacterResponseModel> getCharacters({
+    @Query('page') int? page,
+  });
+}
+```
+
+**2. Configura el cliente en tu capa de DI (en el `main.dart` del ejemplo):**
+
+```dart
+final dio = ApiClientBuilder.build(
+  baseUrl: 'https://rickandmortyapi.com/api/',
+);
+final apiClient = CharacterApiClient(dio);
+final mapper    = const DioExceptionMapper();
+```
+
+**3. Usa las excepciones del paquete en tu DataSource:**
+
+```dart
+// character_remote_data_source.dart
+class CharacterRemoteDataSourceImpl implements CharacterRemoteDataSource {
+  CharacterRemoteDataSourceImpl(this._client, this._mapper);
+
+  final CharacterApiClient _client;
+  final DioExceptionMapper _mapper;   // ← viene del paquete
+
+  @override
+  Future<CharacterResponseModel> getCharacters({int? page}) async {
+    try {
+      return await _client.getCharacters(page: page);
+    } on DioException catch (e) {
+      throw _mapper.map(e);           // ← lanza excepciones del paquete
+    }
+  }
+}
+```
+
+**4. Mapea al modelo genérico del paquete en tu Repository:**
+
+```dart
+// character_repository.dart
+class CharacterRepositoryImpl implements CharacterRepository {
+  final CharacterRemoteDataSource _dataSource;
+
+  CharacterRepositoryImpl(this._dataSource);
+
+  @override
+  Future<PaginatedResponse<Character>> getCharacters({int page = 1}) async {
+    try {
+      final response = await _dataSource.getCharacters(page: page);
+      
+      return PaginatedResponse(        // ← PaginatedResponse del paquete
+        items: response.results,
+        hasNextPage: response.info.next != null,
+        currentPage: page,
+        totalPages: response.info.pages,
+      );
+    } catch (e) {
+      throw e.toFailure();
+    }
+  }
+}
+```
+
+---
+
 ## Cómo ejecutarlo
 
 Sigue estos pasos para poner en marcha el ejemplo:
