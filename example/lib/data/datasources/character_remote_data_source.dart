@@ -1,5 +1,4 @@
 import 'package:remote_data_kit/remote_data_kit.dart';
-import '../client/character_api_client.dart';
 import '../models/character_response_model.dart';
 
 abstract class CharacterRemoteDataSource {
@@ -7,17 +6,17 @@ abstract class CharacterRemoteDataSource {
 }
 
 class CharacterRemoteDataSourceImpl implements CharacterRemoteDataSource {
-  final CharacterApiClient _client;
-  final DioExceptionMapper _mapper;
+  final RemoteDataKit _kit;
 
-  CharacterRemoteDataSourceImpl(this._client, this._mapper);
+  const CharacterRemoteDataSourceImpl(this._kit);
 
   @override
   Future<CharacterResponseModel> getCharacters({int? page}) async {
-    try {
-      return await _client.getCharacters(page: page);
-    } on DioException catch (e) {
-      throw _mapper.map(e);
-    }
+    final response = await _kit.get(
+      '/character',
+      queryParameters: page != null ? {'page': page} : null,
+      fromJson: (json) => CharacterResponseModel.fromJson(json),
+    );
+    return response.data;
   }
 }

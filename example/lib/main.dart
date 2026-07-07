@@ -1,18 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:remote_data_kit/remote_data_kit.dart';
-import 'data/client/character_api_client.dart';
 import 'data/datasources/character_remote_data_source.dart';
 import 'repository/character_repository.dart';
 import 'ui/character_screen.dart';
 
 void main() {
   // Initialization
-  final dio = ApiClientBuilder.build(
+  final kit = RemoteDataKit.create(
     baseUrl: 'https://rickandmortyapi.com/api/',
   );
-  
-  final apiClient = CharacterApiClient(dio);
-  final dataSource = CharacterRemoteDataSourceImpl(apiClient, const DioExceptionMapper());
+
+  final dataSource = CharacterRemoteDataSourceImpl(kit);
   final repository = CharacterRepositoryImpl(dataSource);
 
   runApp(MyApp(repository: repository));

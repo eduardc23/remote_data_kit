@@ -33,12 +33,13 @@ Paquete Dart reutilizable que encapsula la capa de consumo de datos remotos: con
 
 Cuando una aplicación Dart consume múltiples APIs o cuando varios proyectos de un mismo equipo necesitan comunicarse con servicios REST, suele repetirse el mismo código en cada feature y en cada proyecto:
 
-- Configurar `Dio` con timeouts e interceptores.
+- Configurar `Dio` con timeouts y cabeceras.
 - Capturar `DioException` y traducirla a errores de dominio comprensibles.
 - Definir una y otra vez los mismos tipos de excepción (`NetworkException`, `ServerException`, etc.).
 - Crear un modelo de respuesta paginada que varía ligeramente de un proyecto a otro.
+- Acoplar el código consumidor a librerías de red como `Dio`, obligándolo a conocer tipos de implementación.
 
-`remote_data_kit` extrae toda esa infraestructura a un único paquete versionado, de modo que cada proyecto solo aporte lo específico de su API.
+`remote_data_kit` extrae toda esa infraestructura a un único paquete versionado. A partir de la versión `2.0.0`, aplica el **patrón fachada** para que el código consumidor no dependa directamente de `Dio` ni de ningún otro detalle de implementación; cada proyecto solo aporta lo específico de su API.
 
 ---
 
@@ -46,36 +47,13 @@ Cuando una aplicación Dart consume múltiples APIs o cuando varios proyectos de
 
 | Componente | Descripción |
 |---|---|
-| `ApiClientBuilder` | Construye y configura una instancia de `Dio` lista para usar |
-| `DioExceptionMapper` | Traduce `DioException` a excepciones propias del dominio |
-| Excepciones base | `NetworkException`, `ServerException`, `NotFoundException`, `RateLimitException` |
+| `RemoteDataKit` | Fachada principal y único punto de entrada para el consumo de APIs HTTP |
+| `ApiResponse<T>` | Modelo genérico que encapsula la respuesta HTTP sin exponer tipos de Dio |
+| `ApiClientBuilder` | Construye y configura internamente la instancia de `Dio` *(detalle interno)* |
+| `DioExceptionMapper` | Traduce `DioException` a excepciones de dominio *(detalle interno)* |
+| Excepciones de dominio | `NetworkException`, `ServerException`, `NotFoundException`, `RateLimitException` |
 | `PaginatedResponse<T>` | Modelo genérico para respuestas paginadas de cualquier API |
-| `NetworkConstants` | Constantes de red reutilizables (timeouts, duración de rate limit) |
-
----
-
-## Estructura del paquete
-
-```
-remote_data_kit/
-├── CHANGELOG.md
-├── README.md
-├── pubspec.yaml
-├── example/                     
-└── lib/
-    ├── remote_data_kit.dart      
-    └── src/
-        ├── client/
-        │   └── api_client_builder.dart
-        ├── constants/
-        │   └── network_constants.dart
-        ├── exceptions/
-        │   └── network_exceptions.dart
-        ├── mappers/
-        │   └── dio_exception_mapper.dart
-        └── models/
-            └── paginated_response.dart
-```
+| `NetworkConstants` | Fuente de verdad única para constantes de red (timeouts, duración de rate limit) |
 
 ---
 
@@ -88,13 +66,13 @@ dependencies:
   remote_data_kit:
     git:
       url: https://github.com/eduardc23/remote_data_kit.git
-      ref: v1.0.0
+      ref: v2.0.0
 ```
 
 E importa el paquete donde lo necesites:
 
 ```dart
-import 'package:remote_data_kit/remote_data_kit.dart';
+import 'package:remote_data_kit/remote_data_kit_facade.dart';
 ```
 
 ---
@@ -105,55 +83,43 @@ import 'package:remote_data_kit/remote_data_kit.dart';
 
 El siguiente ejemplo muestra cómo encadenar todos los componentes del paquete en un repositorio realista que obtiene una lista paginada de usuarios desde una API REST.
 
-`ApiClientBuilder.build()` acepta tres parámetros opcionales además del `baseUrl`: `connectTimeout` y `receiveTimeout` (en milisegundos, con default de 30 000 ms) y una lista de `interceptors` para adjuntar lógica transversal como autenticación o logging. En el ejemplo se sobrescriben los timeouts y se inyecta un interceptor de autorización.
+`RemoteDataKit.create()` acepta tres parámetros opcionales además del `baseUrl`: `connectTimeoutMs` y `receiveTimeoutMs` (en milisegundos, usando `NetworkConstants` como valores por defecto) y un mapa de `headers` para cabeceras estáticas como `Accept` o identificadores de versión de la app.
+
+`ApiResponse<T>` encapsula la respuesta HTTP con dos campos: `data` con el objeto deserializado al tipo `T` indicado, y `statusCode` con el código HTTP recibido.
 
 `PaginatedResponse<T>` provee cuatro campos listos para navegar la paginación: `items` con la lista tipada de elementos, `hasNextPage` para saber si existe una página siguiente, y los opcionales `currentPage` y `totalPages` cuando la API los incluye en su respuesta.
 
 ```dart
-import 'package:dio/dio.dart';
 import 'package:remote_data_kit/remote_data_kit.dart';
  
 /// Repositorio que consume el endpoint /users de una API REST.
 class UserRepository {
-  final Dio _dio;
-  final DioExceptionMapper _mapper;
+  final RemoteDataKit _kit;
  
   UserRepository()
-      : _dio = ApiClientBuilder.build(
+      : _kit = RemoteDataKit.create(
           baseUrl: 'https://api.example.com/',
-          connectTimeout: 15000,  // sobrescribe el default de 30 000 ms
-          receiveTimeout: 20000,
-          interceptors: [
-            InterceptorsWrapper(
-              onRequest: (options, handler) {
-                // Adjunta el token en cada solicitud de forma centralizada.
-                options.headers['Authorization'] = 'Bearer <token>';
-                handler.next(options);
-              },
-            ),
-          ],
-        ),
-        _mapper = DioExceptionMapper();
+          connectTimeoutMs: 15000, // sobrescribe el default de NetworkConstants
+          receiveTimeoutMs: 20000,
+          headers: {
+            'Accept': 'application/json',
+            'X-App-Version': '2.0.0',
+          },
+        );
  
   Future<PaginatedResponse<Map<String, dynamic>>> getUsers({
     int page = 1,
   }) async {
-    try {
-      final response = await _dio.get(
-        '/users',
-        queryParameters: {'page': page},
-      );
+    final response = await _kit.get(
+      '/users',
+      queryParameters: {'page': page},
+      fromJson: (json) => PaginatedResponse.fromJson(
+        json,
+        (item) => item as Map<String, dynamic>,
+      ),
+    );
  
-      return PaginatedResponse.fromJson(
-        response.data,
-        (json) => json as Map<String, dynamic>,
-      );
-    } on DioException catch (e) {
-      // map() inspecciona el tipo de DioException y el código HTTP para decidir
-      // qué excepción de dominio lanzar: NetworkException, NotFoundException,
-      // RateLimitException o ServerException. 
-      throw _mapper.map(e);
-    }
+    return response.data;
   }
 }
  
@@ -163,9 +129,8 @@ void main() async {
   try {
     final result = await repo.getUsers(page: 1);
  
-    // PaginatedResponse expone los campos necesarios para manejar la paginación.
-    print('Página actual  : ${result.currentPage}');
-    print('Total páginas  : ${result.totalPages}');
+    print('Página actual    : ${result.currentPage}');
+    print('Total páginas    : ${result.totalPages}');
     print('¿Hay más páginas?: ${result.hasNextPage}');
     print('Usuarios en esta página: ${result.items.length}');
  
@@ -176,7 +141,7 @@ void main() async {
       print('Página siguiente: ${nextResult.items}');
     }
   } on NotFoundException {
-    print('Recurso no encontrado');
+    print('Recurso no encontrado.');
   } on ServerException catch (e) {
     print('Error del servidor: ${e.message} (código: ${e.statusCode})');
   } on RateLimitException catch (e) {
@@ -203,29 +168,28 @@ abstract final class NetworkConstants {
 }
 ```
 
-#### ApiClientBuilder
+#### RemoteDataKit
 
-Crea una instancia de `Dio` preconfigurada con los timeouts definidos en `NetworkConstants` e interceptores opcionales.
+Crea una instancia configurada lista para consumir cualquier API REST. Es el único tipo que el consumidor necesita conocer para realizar solicitudes HTTP:
 
 ```dart
 // Uso básico — solo con baseUrl
-final dio = ApiClientBuilder.build(
+final kit = RemoteDataKit.create(
   baseUrl: 'https://api.example.com/',
 );
-
-// Uso avanzado — con interceptores personalizados
-final dio = ApiClientBuilder.build(
+ 
+// Uso con cabeceras estáticas y timeouts personalizados
+final kit = RemoteDataKit.create(
   baseUrl: 'https://api.example.com/',
-  interceptors: [
-    InterceptorsWrapper(
-      onRequest: (options, handler) {
-        options.headers['Authorization'] = 'Bearer <token>';
-        handler.next(options);
-      },
-    ),
-  ],
+  connectTimeoutMs: 15000,
+  receiveTimeoutMs: 20000,
+  headers: {
+    'Accept': 'application/json',
+    'X-App-Version': '2.0.0',
+  },
 );
 ```
+
 
 #### Excepciones de red
 

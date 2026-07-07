@@ -2,6 +2,9 @@ import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:remote_data_kit/remote_data_kit.dart';
+import 'package:remote_data_kit/src/client/api_client_builder.dart';
+import 'package:remote_data_kit/src/constants/network_constants.dart';
+import 'package:remote_data_kit/src/mappers/dio_exception_mapper.dart';
 import 'package:test/test.dart';
 
 void main() {
@@ -10,54 +13,31 @@ void main() {
   // ─────────────────────────────────────────────
   group('ApiClientBuilder', () {
     test('construye un cliente Dio con la configuración proporcionada', () {
-      // Arrange
-      final interceptor = InterceptorsWrapper();
-
       // Act
       final client = ApiClientBuilder.build(
         baseUrl: 'https://example.com',
         connectTimeout: 5000,
         receiveTimeout: 7000,
-        interceptors: [interceptor],
       );
 
       // Assert
       expect(client.options.baseUrl, 'https://example.com');
       expect(client.options.connectTimeout, const Duration(milliseconds: 5000));
       expect(client.options.receiveTimeout, const Duration(milliseconds: 7000));
-      expect(client.interceptors, contains(interceptor));
     });
 
-    test(
-      'usa los valores por defecto de NetworkConstants cuando no se proveen timeouts',
-      () {
-        // Act
-        final client = ApiClientBuilder.build(baseUrl: 'https://example.com');
+    test('Aplica headers cuando se proporcionan', () {
+      // Act
+      final client = ApiClientBuilder.build(
+        baseUrl: 'https://example.com',
+        connectTimeout: 5000,
+        receiveTimeout: 7000,
+        headers: {'X-Test': 'true'},
+      );
 
-        // Assert — garantiza que el contrato entre NetworkConstants
-        // y ApiClientBuilder no se rompa si se modifican los defaults.
-        expect(
-          client.options.connectTimeout,
-          const Duration(milliseconds: NetworkConstants.defaultConnectTimeout),
-        );
-        expect(
-          client.options.receiveTimeout,
-          const Duration(milliseconds: NetworkConstants.defaultReceiveTimeout),
-        );
-      },
-    );
-
-    test(
-      'construye un cliente sin interceptores externos cuando no se proveen',
-      () {
-        // Act
-        final client = ApiClientBuilder.build(baseUrl: 'https://example.com');
-
-        // Assert — Dio agrega su propio interceptor interno, por eso se filtra
-        // por InterceptorsWrapper para verificar que no se añadió ninguno externo.
-        expect(client.interceptors.whereType<InterceptorsWrapper>(), isEmpty);
-      },
-    );
+      // Assert
+      expect(client.options.headers['X-Test'], 'true');
+    });
   });
 
   // ─────────────────────────────────────────────
@@ -228,7 +208,7 @@ void main() {
     );
 
     test(
-      'convierte errores desconocidos sin excepción de dominio en NetworkException',
+      'convierte errores desconocidos sin excepción de dominio en ServerException',
       () {
         // Arrange
         final exception = DioException(
@@ -289,6 +269,35 @@ void main() {
       // Assert
       expect(response.items, isEmpty);
       expect(response.hasNextPage, isFalse);
+    });
+  });
+
+  // ─────────────────────────────────────────────
+  // RemoteDataKit (Fachada)
+  // ─────────────────────────────────────────────
+  group('RemoteDataKit', () {
+    test('create inicializa el cliente con los valores por defecto', () {
+      final kit = RemoteDataKit.create(baseUrl: 'https://example.com');
+      final dio = kit.internalDio;
+
+      expect(dio.options.baseUrl, 'https://example.com');
+      expect(
+        dio.options.connectTimeout,
+        const Duration(milliseconds: NetworkConstants.defaultConnectTimeout),
+      );
+      expect(
+        dio.options.receiveTimeout,
+        const Duration(milliseconds: NetworkConstants.defaultReceiveTimeout),
+      );
+    });
+
+    test('create aplica headers personalizados', () {
+      final kit = RemoteDataKit.create(
+        baseUrl: 'https://example.com',
+        headers: {'Authorization': 'Bearer token'},
+      );
+      
+      expect(kit.internalDio.options.headers['Authorization'], 'Bearer token');
     });
   });
 }
