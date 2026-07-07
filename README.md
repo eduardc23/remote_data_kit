@@ -1,6 +1,6 @@
 # Remote data kit
 
-![Versión](https://img.shields.io/badge/versión-1.0.0-blue)
+![Versión](https://img.shields.io/badge/versión-2.0.0-blue)
 ![Dart](https://img.shields.io/badge/Dart-%3E%3D3.0.0-blue)
 ![Dio](https://img.shields.io/badge/Dio-5.x-orange)
 ![Licencia](https://img.shields.io/badge/licencia-MIT-green)

@@ -9,7 +9,6 @@
 - `ApiClientBuilder` pasa a ser un detalle de implementación interno; el consumidor ya no lo instancia directamente.
 - `DioExceptionMapper` pasa a ser un detalle de implementación interno; las excepciones de red se obtienen únicamente a través de `NetworkException`.
 - Los `headers` estáticos ahora se configuran como `Map<String, String>` directamente en `RemoteDataKit.create`, en lugar de mediante interceptores.
-- Los timeouts `connectTimeoutMs` y `receiveTimeoutMs` en `RemoteDataKit.create` ahora usan `NetworkConstants` como fuente de verdad única, eliminando valores duplicados.
 
 ### Ruptura de compatibilidad
 - El consumidor ya no debe instalar ni importar `dio` directamente; toda interacción ocurre a través de `RemoteDataKit`.
